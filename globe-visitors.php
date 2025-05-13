@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Interactive Globes Addon - Recent Visitors
  * Description: Displays recent visitor locations on an Interactive Globe.
- * Version: 1.0
+ * Version: 1.1 
  * Author: Interactive Globes Team
  */
 
@@ -366,42 +366,28 @@ function rvg_add_recent_visitors_to_globe($meta, $id) {
 }
 
 // Add JavaScript tracking
-add_action('wp_footer', 'rvg_add_tracking_script');
+add_action('wp_enqueue_scripts', 'rvg_enqueue_tracking_script');
 
-function rvg_add_tracking_script() {
-    ?>
-    <script>
-    (function() {
-        // Only track if we're not in admin
-        if (window.location.pathname.indexOf('/wp-admin') !== -1) return;
+function rvg_enqueue_tracking_script() {
+    if (is_admin()) return;
 
-        // Get visitor's IP and location
-        fetch('https://ipinfo.io/json')
-            .then(response => response.json())
-            .then(data => {
-                // Send data to our tracking endpoint
-                const formData = new FormData();
-                formData.append('action', 'rvg_track_visitor');
-                formData.append('ip', data.ip);
-                formData.append('location', JSON.stringify({
-                    country: data.country,
-                    region: data.region,
-                    city: data.city,
-                    lat: parseFloat(data.loc.split(',')[0]),
-                    lon: parseFloat(data.loc.split(',')[1]),
-                    isp: data.org
-                }));
+    // Add ajaxurl to the page
+    wp_add_inline_script('jquery', 'var ajaxurl = "' . admin_url('admin-ajax.php') . '";', 'before');
 
-                fetch(ajaxurl, {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                });
-            })
-            .catch(error => console.error('Error tracking visitor:', error));
-    })();
-    </script>
-    <?php
+    // Enqueue our tracking script
+    wp_enqueue_script(
+        'rvg-tracking',
+        plugins_url('js/tracking.js', __FILE__),
+        array('jquery'),
+        filemtime(plugin_dir_path(__FILE__) . 'js/tracking.js'),
+        true
+    );
+
+    // Add any necessary data to the script
+    wp_localize_script('rvg-tracking', 'rvgTracking', array(
+        'ajaxurl' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('rvg_track_visitor')
+    ));
 }
 
 // Add AJAX endpoint for tracking
@@ -409,8 +395,8 @@ add_action('wp_ajax_rvg_track_visitor', 'rvg_ajax_track_visitor');
 add_action('wp_ajax_nopriv_rvg_track_visitor', 'rvg_ajax_track_visitor');
 
 function rvg_ajax_track_visitor() {
-    // Verify nonce if needed
-    // check_ajax_referer('rvg_track_visitor', 'nonce');
+    // Verify nonce
+    check_ajax_referer('rvg_track_visitor', 'nonce');
 
     $ip = sanitize_text_field($_POST['ip']);
     $location = json_decode(stripslashes($_POST['location']), true);
@@ -451,4 +437,14 @@ function rvg_ajax_track_visitor() {
     
     update_option('rvg_recent_visitors', $visitors);
     wp_send_json_success();
+}
+
+// Add the script to the page even when cached
+add_action('init', 'rvg_add_tracking_script_to_cache');
+function rvg_add_tracking_script_to_cache() {
+    if (!is_admin()) {
+        add_action('wp_head', function() {
+            echo '<script>var ajaxurl = "' . admin_url('admin-ajax.php') . '";</script>';
+        }, 1);
+    }
 }
