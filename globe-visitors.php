@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Interactive Globes Addon - Recent Visitors
  * Description: Displays recent visitor locations on an Interactive Globe.
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Interactive Globes Team
  */
 
