@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Interactive Globes Addon - Recent Visitors
  * Description: Displays recent visitor locations on an Interactive Globe.
- * Version: 1.1 
+ * Version: 1.1.1
  * Author: Interactive Globes Team
  */
 
@@ -43,68 +43,8 @@ function rvg_extend_globe_model( $model ) {
         'desc' => 'Display markers for recent site visitors on the globe.',
 		'fields' => $fields,
 	];
-
-    $model['meta']['globe_info']['sections']['html_markers']['fields']['recent_visitors_html'] = [
-        'type' => 'fieldset',
-		'title' => 'Recent Visitors',
-        'desc' => 'Display html markers for recent site visitors on the globe.',
-		'fields' => $fields,
-	];
-
-    $model['meta']['globe_info']['sections']['dotlabel']['fields']['recent_visitors_dotLabels'] = [
-        'type' => 'fieldset',
-		'title' => 'Recent Visitors',
-        'desc' => 'Display html markers for recent site visitors on the globe.',
-		'fields' => $fields,
-	];
-
-
-
-
     // add recent visitors to globe info
 	return $model;
-}
-	
-
-// 1. Track visitor and store location
-function rvg_track_visitor_location($meta) {
-	if (is_admin()) return;
-
-	$ip = rvg_get_user_ip();
-	$location = rvg_get_location_from_ip($ip);
-
-	if (!$location) return;
-
-	$new_entry = [
-		'ip' => $ip,
-		'timestamp' => time(),
-		'location' => $location,
-	];
-
-	$visitors = get_option('rvg_recent_visitors', []);
-	if (!is_array($visitors)) $visitors = [];
-
-	// Update timestamp for existing IP or add new visitor
-	$found = false;
-	foreach ($visitors as &$entry) {
-		if ($entry['ip'] === $ip) {
-			$entry['timestamp'] = time();
-			$found = true;
-			break;
-		}
-	}
-	
-	if (!$found) {
-		$visitors[] = $new_entry;
-	}
-    
-    // Clean up old entries (older than 24 hours)
-    $threshold = time() - (24 * HOUR_IN_SECONDS);
-    $visitors = array_filter($visitors, function($entry) use ($threshold) {
-        return $entry['timestamp'] >= $threshold;
-    });
-    
-    update_option('rvg_recent_visitors', $visitors);
 }
 
 // 2. Get IP
@@ -215,145 +155,36 @@ function rvg_get_recent_visitor_locations($time_limit = 30) {
 function rvg_add_recent_visitors_to_globe($meta, $id) {
     // check if recent visitors are enabled
     $recent_visitors_markers_enabled = isset($meta['recent_visitors_markers']['enabled']) && boolval($meta['recent_visitors_markers']['enabled']) ? true : false;
-    $recent_visitors_html_enabled = isset($meta['recent_visitors_html']['enabled']) && boolval($meta['recent_visitors_html']['enabled']) ? true : false;
-    $recent_visitors_dotLabels_enabled = isset($meta['recent_visitors_dotLabels']['enabled']) && boolval($meta['recent_visitors_dotLabels']['enabled']) ? true : false;
-
     // if all recent visitors are disabled, return
-    if (!$recent_visitors_markers_enabled && !$recent_visitors_html_enabled && !$recent_visitors_dotLabels_enabled) return $meta;    
-
-    rvg_track_visitor_location($meta);
-
-    // what type of markers are enabled? multiple can be enabled
-    $markers_enabled = [];
-    $marker_type_settings_enabled = [];
-    if ($recent_visitors_markers_enabled) {
-        $markers_enabled[] = 'points';
-        $marker_type_settings_enabled[] = 'recent_visitors_markers';
+    if (!$recent_visitors_markers_enabled) return $meta;    
+    
+    if (!isset($meta['points']) || !is_array($meta['points'])) {
+        $meta['points'] = [];
     }
-    if ($recent_visitors_html_enabled) {
-        $markers_enabled[] = 'html';
-        $marker_type_settings_enabled[] = 'recent_visitors_html';
-    }
-    if ($recent_visitors_dotLabels_enabled) {
-        $markers_enabled[] = 'dotLabels';
-        $marker_type_settings_enabled[] = 'recent_visitors_dotLabels';
-    }
-
-    foreach ($markers_enabled as $marker) {
-        if (!isset($meta[$marker]) || !is_array($meta[$marker])) {
-            $meta[$marker] = [];
-        }
-    }
-
-    // Get the minimum time limit from all enabled markers
-    $time_limit = 30;
-    foreach ($marker_type_settings_enabled as $marker) {
-        if (isset($meta[$marker]['time_limit'])) {
-            $marker_time_limit = intval($meta[$marker]['time_limit']);
-            $time_limit = min($time_limit, $marker_time_limit);
-        }
-    }
-
-    $visitors = rvg_get_recent_visitor_locations($time_limit);
-
-    // Group visitors by location
-    $grouped_visitors = [];
-    foreach ($visitors as $visitor) {
-        $location = $visitor['location'];
-        $key = $location['lat'] . ',' . $location['lon'];
-        
-        if (!isset($grouped_visitors[$key])) {
-            $grouped_visitors[$key] = [
-                'count' => 1,
-                'location' => $location,
-                'cities' => [$location['city']],
-                'countries' => [$location['country']]
-            ];
-        } else {
-            $grouped_visitors[$key]['count']++;
-            if (!in_array($location['city'], $grouped_visitors[$key]['cities'])) {
-                $grouped_visitors[$key]['cities'][] = $location['city'];
-            }
-            if (!in_array($location['country'], $grouped_visitors[$key]['countries'])) {
-                $grouped_visitors[$key]['countries'][] = $location['country'];
-            }
-        }
-    }
-
-    // Add points for each unique location
-    foreach ($grouped_visitors as $key => $group) {
-        $location = $group['location'];
-        $cities = array_unique($group['cities']);
-        $countries = array_unique($group['countries']);
-        
-        $tooltip = sprintf(
-            _n(
-                '%d visitor from %s, %s',
-                '%d visitors from %s, %s',
-                $group['count'],
-                'globe-visitors'
-            ),
-            $group['count'],
-            implode(', ', $cities),
-            implode(', ', $countries)
-        );
-
-        // defaults 
-        $defaults = [
-            'points' => 'pointDefaults',
-            'html' => 'htmlDefaults',
-            'dotLabels' => 'labelDefaults'
-        ];
-
-        foreach ($markers_enabled as $marker) {
-            // Skip if defaults don't exist
-            if (!isset($defaults[$marker]) || !isset($meta[$defaults[$marker]])) {
-                continue;
-            }
-
-            $markerDefaults = $meta[$defaults[$marker]];
-            $newMarker = [
-                'id' => 'visitor_' . md5($key),
-                'name' => esc_html($location['city'] . ', ' . $location['country']),
-                'title' => $location['city'],
-                'latitude' => floatval($location['lat']),
-                'longitude' => floatval($location['lon']),
-                'tooltipContent' => esc_html($tooltip),
-                'useCustom' => '0',
-                'location' => $location,
-                'globe_id' => absint($id),
-                'source' => 'visitors',
-                'visitor_count' => $group['count'],
-                'visitor_cities' => $group['cities'],
-                'visitor_countries' => $group['countries']
-            ];
-
-            // Merge with defaults and add to points
-            $meta[$marker][] = array_merge($markerDefaults, $newMarker);
-        }
-    }
+    
+    rvg_enqueue_scripts(
+        [
+            'globe_id' => $id,
+            'time_limit' => $meta['recent_visitors_markers']['time_limit'],
+            'defaults' => $meta['pointDefaults']
+        ]
+    );
 
     $hook = 'itt_globes/render/content_before';
-    add_action($hook, function($content, $id) use ($visitors, $meta, $marker_type_settings_enabled) {
-        $visitor_count = count($visitors);
-        $countries = array_unique(array_column(array_column($visitors, 'location'), 'country'));
-        $country_count = count($countries);
+    add_action($hook, function($content, $id) use ($meta) {
         
         // Get the first message we find from enabled markers
         $message = '';
-        foreach ($marker_type_settings_enabled as $marker_settings) {
-            if (isset($meta[$marker_settings]['message'])) {
-                $message = $meta[$marker_settings]['message'];
-                break;
-            }
+        if (isset($meta['recent_visitors_markers']['message'])) {
+            $message = $meta['recent_visitors_markers']['message'];
         }
         
         if (empty($message)) {
             $message = '{count} recent visitors from {country_count} countries';
         }
         
-        $message = str_replace('{count}', '<span class="visitor-count">' . $visitor_count . '</span>', $message);
-        $message = str_replace('{country_count}', '<span class="country-count">' . $country_count . '</span>', $message);
+        $message = str_replace('{count}', '<span class="visitor-count"></span>', $message);
+        $message = str_replace('{country_count}', '<span class="country-count"></span>', $message);
         
         return sprintf(
             '<div class="rvg-recent-visitors" style="text-align: center"><p>%s</p></div>%s',
@@ -365,45 +196,22 @@ function rvg_add_recent_visitors_to_globe($meta, $id) {
     return $meta;
 }
 
-// Add JavaScript tracking
-add_action('wp_enqueue_scripts', 'rvg_enqueue_tracking_script');
-
-function rvg_enqueue_tracking_script() {
-    if (is_admin()) return;
-
-    // Add ajaxurl to the page
-    wp_add_inline_script('jquery', 'var ajaxurl = "' . admin_url('admin-ajax.php') . '";', 'before');
-
-    // Enqueue our tracking script
-    wp_enqueue_script(
-        'rvg-tracking',
-        plugins_url('js/tracking.js', __FILE__),
-        array('jquery'),
-        filemtime(plugin_dir_path(__FILE__) . 'js/tracking.js'),
-        true
-    );
-
-    // Add any necessary data to the script
-    wp_localize_script('rvg-tracking', 'rvgTracking', array(
-        'ajaxurl' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('rvg_track_visitor')
-    ));
-}
-
-// Add AJAX endpoint for tracking
+// Add AJAX endpoints
 add_action('wp_ajax_rvg_track_visitor', 'rvg_ajax_track_visitor');
 add_action('wp_ajax_nopriv_rvg_track_visitor', 'rvg_ajax_track_visitor');
 
+// AJAX handler for tracking visitors
 function rvg_ajax_track_visitor() {
-    // Verify nonce
-    check_ajax_referer('rvg_track_visitor', 'nonce');
+    check_ajax_referer('rvg_nonce', 'nonce');
 
-    $ip = sanitize_text_field($_POST['ip']);
-    $location = json_decode(stripslashes($_POST['location']), true);
+    $ip = rvg_get_user_ip();
+    if (empty($ip)) {
+        wp_send_json_error('Could not detect IP address');
+    }
 
-    if (!$ip || !$location) {
-        wp_send_json_error('Invalid data');
-        return;
+    $location = rvg_get_location_from_ip($ip);
+    if (!$location) {
+        wp_send_json_error('Could not get location data');
     }
 
     $new_entry = [
@@ -431,20 +239,51 @@ function rvg_ajax_track_visitor() {
     
     // Clean up old entries (older than 24 hours)
     $threshold = time() - (24 * HOUR_IN_SECONDS);
+    
     $visitors = array_filter($visitors, function($entry) use ($threshold) {
         return $entry['timestamp'] >= $threshold;
     });
     
     update_option('rvg_recent_visitors', $visitors);
-    wp_send_json_success();
+
+    $time_limit = isset($POST['time_limit']) ? intval($POST['time_limit']) : 30;
+
+    // only send entries that are within the time limit
+    $visitors = array_filter($visitors, function($entry) use ($time_limit) {
+        return $entry['timestamp'] >= (time() - ($time_limit * 60));
+    });
+
+    // Remove 'ip' from the current visitor data
+    $current_visitor = $new_entry;
+    unset($current_visitor['ip']);
+
+    // Remove 'ip' from all visitors data
+    $visitors_without_ip = array_map(function($entry) {
+        unset($entry['ip']);
+        return $entry;
+    }, $visitors);
+
+    wp_send_json_success([
+        'current_visitor' => $current_visitor,
+        'all_visitors' => $visitors_without_ip
+    ]);
 }
 
-// Add the script to the page even when cached
-add_action('init', 'rvg_add_tracking_script_to_cache');
-function rvg_add_tracking_script_to_cache() {
-    if (!is_admin()) {
-        add_action('wp_head', function() {
-            echo '<script>var ajaxurl = "' . admin_url('admin-ajax.php') . '";</script>';
-        }, 1);
-    }
+// Enqueue scripts
+function rvg_enqueue_scripts( $data ) {
+    wp_enqueue_script('jquery');
+    wp_enqueue_script(
+        'rvg-visitor-tracker',
+        plugins_url('js/visitor-tracker.js', __FILE__),
+        array('jquery'),
+        '1.0.0',
+        true
+    );
+
+    wp_localize_script('rvg-visitor-tracker', 'rvg_ajax', array(
+        'globe_id' => $data['globe_id'],
+        'data' => $data,
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('rvg_nonce')
+    ));
 }
