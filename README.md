@@ -2,6 +2,9 @@
 
 A WordPress plugin that displays recent visitor locations on an Interactive Globe. It tracks and visualizes your website visitors' locations in real-time, showing where your audience is coming from around the world. This is an Addon to Interactive Globes Pro. It will not work as a standalone.
 
+[![Download Interactive Globes Addon](https://img.shields.io/badge/Download-Interactive%20Globes%20Recent%20Visitors%20Addon-blue?style=for-the-badge&logo=wordpress)](https://github.com/Interactive-Globes/recent-visitors/archive/refs/heads/main.zip)
+
+
 
 ## Features
 
