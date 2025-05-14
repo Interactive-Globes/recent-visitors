@@ -35,6 +35,13 @@ function rvg_extend_globe_model( $model ) {
             'default' => '{count} recent visitors from {country_count} countries',
             'dependency' => ['enabled', '==', true],
         ],
+        'random' => [
+            'type' => 'number',
+            'title' => 'Random',
+            'desc' => 'The number of random visitors to display.',
+            'default' => 0,
+            'dependency' => ['enabled', '==', true],
+        ]
     ];
 
 	$model['meta']['globe_info']['sections']['points']['fields']['recent_visitors_markers'] = [
@@ -166,7 +173,8 @@ function rvg_add_recent_visitors_to_globe($meta, $id) {
         [
             'globe_id' => $id,
             'time_limit' => $meta['recent_visitors_markers']['time_limit'],
-            'defaults' => $meta['pointDefaults']
+            'defaults' => $meta['pointDefaults'],
+            'recent_visitors_markers' => $meta['recent_visitors_markers']
         ]
     );
 
@@ -199,6 +207,55 @@ function rvg_add_recent_visitors_to_globe($meta, $id) {
 // Add AJAX endpoints
 add_action('wp_ajax_rvg_track_visitor', 'rvg_ajax_track_visitor');
 add_action('wp_ajax_nopriv_rvg_track_visitor', 'rvg_ajax_track_visitor');
+
+// Function to generate random location data
+function rvg_get_random_locations() {
+    $locations = [
+        // North America
+        ['country' => 'US', 'region' => 'California', 'city' => 'Los Angeles', 'lat' => 34.0522, 'lon' => -118.2437, 'isp' => 'AT&T'],
+        ['country' => 'US', 'region' => 'New York', 'city' => 'New York', 'lat' => 40.7128, 'lon' => -74.0060, 'isp' => 'Verizon'],
+        ['country' => 'US', 'region' => 'Texas', 'city' => 'Houston', 'lat' => 29.7604, 'lon' => -95.3698, 'isp' => 'Comcast'],
+        ['country' => 'CA', 'region' => 'Ontario', 'city' => 'Toronto', 'lat' => 43.6532, 'lon' => -79.3832, 'isp' => 'Rogers'],
+        ['country' => 'MX', 'region' => 'Mexico City', 'city' => 'Mexico City', 'lat' => 19.4326, 'lon' => -99.1332, 'isp' => 'Telmex'],
+        
+        // Europe
+        ['country' => 'GB', 'region' => 'England', 'city' => 'London', 'lat' => 51.5074, 'lon' => -0.1278, 'isp' => 'BT Group'],
+        ['country' => 'DE', 'region' => 'Berlin', 'city' => 'Berlin', 'lat' => 52.5200, 'lon' => 13.4050, 'isp' => 'Deutsche Telekom'],
+        ['country' => 'FR', 'region' => 'Île-de-France', 'city' => 'Paris', 'lat' => 48.8566, 'lon' => 2.3522, 'isp' => 'Orange'],
+        ['country' => 'IT', 'region' => 'Lazio', 'city' => 'Rome', 'lat' => 41.9028, 'lon' => 12.4964, 'isp' => 'TIM'],
+        ['country' => 'ES', 'region' => 'Madrid', 'city' => 'Madrid', 'lat' => 40.4168, 'lon' => -3.7038, 'isp' => 'Telefónica'],
+        
+        // Asia
+        ['country' => 'JP', 'region' => 'Tokyo', 'city' => 'Tokyo', 'lat' => 35.6762, 'lon' => 139.6503, 'isp' => 'NTT'],
+        ['country' => 'CN', 'region' => 'Beijing', 'city' => 'Beijing', 'lat' => 39.9042, 'lon' => 116.4074, 'isp' => 'China Telecom'],
+        ['country' => 'IN', 'region' => 'Maharashtra', 'city' => 'Mumbai', 'lat' => 19.0760, 'lon' => 72.8777, 'isp' => 'Airtel'],
+        ['country' => 'SG', 'region' => 'Singapore', 'city' => 'Singapore', 'lat' => 1.3521, 'lon' => 103.8198, 'isp' => 'SingTel'],
+        ['country' => 'KR', 'region' => 'Seoul', 'city' => 'Seoul', 'lat' => 37.5665, 'lon' => 126.9780, 'isp' => 'KT'],
+        
+        // South America
+        ['country' => 'BR', 'region' => 'São Paulo', 'city' => 'São Paulo', 'lat' => -23.5505, 'lon' => -46.6333, 'isp' => 'Vivo'],
+        ['country' => 'AR', 'region' => 'Buenos Aires', 'city' => 'Buenos Aires', 'lat' => -34.6037, 'lon' => -58.3816, 'isp' => 'Telecom Argentina'],
+        ['country' => 'CO', 'region' => 'Bogotá', 'city' => 'Bogotá', 'lat' => 4.7110, 'lon' => -74.0721, 'isp' => 'Claro'],
+        ['country' => 'PE', 'region' => 'Lima', 'city' => 'Lima', 'lat' => -12.0464, 'lon' => -77.0428, 'isp' => 'Movistar'],
+        ['country' => 'CL', 'region' => 'Santiago', 'city' => 'Santiago', 'lat' => -33.4489, 'lon' => -70.6693, 'isp' => 'Entel'],
+        
+        // Africa
+        ['country' => 'ZA', 'region' => 'Gauteng', 'city' => 'Johannesburg', 'lat' => -26.2041, 'lon' => 28.0473, 'isp' => 'Vodacom'],
+        ['country' => 'EG', 'region' => 'Cairo', 'city' => 'Cairo', 'lat' => 30.0444, 'lon' => 31.2357, 'isp' => 'Orange Egypt'],
+        ['country' => 'NG', 'region' => 'Lagos', 'city' => 'Lagos', 'lat' => 6.5244, 'lon' => 3.3792, 'isp' => 'MTN'],
+        ['country' => 'KE', 'region' => 'Nairobi', 'city' => 'Nairobi', 'lat' => -1.2921, 'lon' => 36.8219, 'isp' => 'Safaricom'],
+        ['country' => 'MA', 'region' => 'Casablanca', 'city' => 'Casablanca', 'lat' => 33.5731, 'lon' => -7.5898, 'isp' => 'Maroc Telecom'],
+        
+        // Oceania
+        ['country' => 'AU', 'region' => 'New South Wales', 'city' => 'Sydney', 'lat' => -33.8688, 'lon' => 151.2093, 'isp' => 'Telstra'],
+        ['country' => 'NZ', 'region' => 'Auckland', 'city' => 'Auckland', 'lat' => -36.8509, 'lon' => 174.7645, 'isp' => 'Spark'],
+        ['country' => 'FJ', 'region' => 'Suva', 'city' => 'Suva', 'lat' => -18.1416, 'lon' => 178.4419, 'isp' => 'Digicel'],
+        ['country' => 'PG', 'region' => 'Port Moresby', 'city' => 'Port Moresby', 'lat' => -9.4780, 'lon' => 147.1500, 'isp' => 'Digicel'],
+        ['country' => 'SB', 'region' => 'Honiara', 'city' => 'Honiara', 'lat' => -9.4456, 'lon' => 159.9729, 'isp' => 'Our Telekom']
+    ];
+    
+    return $locations;
+}
 
 // AJAX handler for tracking visitors
 function rvg_ajax_track_visitor() {
@@ -246,12 +303,50 @@ function rvg_ajax_track_visitor() {
     
     update_option('rvg_recent_visitors', $visitors);
 
-    $time_limit = isset($POST['time_limit']) ? intval($POST['time_limit']) : 30;
+    $time_limit = isset($_POST['time_limit']) ? intval($_POST['time_limit']) : 30;
+    $random_count = isset($_POST['random']) ? intval($_POST['random']) : 0;
 
     // only send entries that are within the time limit
     $visitors = array_filter($visitors, function($entry) use ($time_limit) {
         return $entry['timestamp'] >= (time() - ($time_limit * 60));
     });
+
+    // Add random entries if enabled
+    if ($random_count > 0) {
+        // Get or create cached random entries
+        $cache_key = 'rvg_random_entries';
+        $random_entries = get_transient($cache_key);
+        
+        if ($random_entries === false) {
+            // Generate new random entries
+            $all_locations = rvg_get_random_locations();
+            shuffle($all_locations);
+            
+            // If we need more entries than we have unique locations
+            if ($random_count > count($all_locations)) {
+                $random_entries = [];
+                // Fill with all locations first
+                $random_entries = $all_locations;
+                // Then add more by randomly selecting from all locations
+                while (count($random_entries) < $random_count) {
+                    $random_entries[] = $all_locations[array_rand($all_locations)];
+                }
+            } else {
+                $random_entries = array_slice($all_locations, 0, $random_count);
+            }
+            
+            // Cache for 5 minutes
+            set_transient($cache_key, $random_entries, 5 * MINUTE_IN_SECONDS);
+        }
+        
+        // Add random entries to visitors
+        foreach ($random_entries as $random_location) {
+            $visitors[] = [
+                'timestamp' => time() - rand(1, $time_limit * 60),
+                'location' => $random_location
+            ];
+        }
+    }
 
     // Remove 'ip' from the current visitor data
     $current_visitor = $new_entry;
@@ -282,7 +377,9 @@ function rvg_enqueue_scripts( $data ) {
 
     wp_localize_script('rvg-visitor-tracker', 'rvg_ajax', array(
         'globe_id' => $data['globe_id'],
-        'data' => $data,
+        'data' => array_merge($data, [
+            'recent_visitors_markers' => isset($data['recent_visitors_markers']) ? $data['recent_visitors_markers'] : []
+        ]),
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('rvg_nonce')
     ));

@@ -42,6 +42,7 @@
             data: {
                 action: 'rvg_track_visitor',
                 time_limit: rvg_ajax.data.time_limit,
+                random: rvg_ajax.data.recent_visitors_markers?.random || 0,
                 nonce: rvg_ajax.nonce
             },
             success: function(response) {
